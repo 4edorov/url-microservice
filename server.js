@@ -58,7 +58,6 @@ app.get('/:link', async (req, res) => {
   const {link} = req.params
 
   const coll = DbConn.getColl()
-
   const mongoRes = await coll.findOne({short: link})
 
   if (!mongoRes) {
