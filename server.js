@@ -13,8 +13,8 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, './client/index.html'))
 })
 
-app.get('/new/:url', async (req, res) => {
-  const {url} = req.params
+app.get('/new/*', async (req, res) => {
+  const url = req.params[0]
   debug.debug('url', url)
 
   const urlPattern = /^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/g
@@ -25,17 +25,16 @@ app.get('/new/:url', async (req, res) => {
     return
   }
 
-  const coll = DbConn.getColl()
+  const formShortUrl = uniq => {
+    const localPort = process.env.NODE_ENV === 'development' ? ':' + port : ''
+    return `${process.env.BASE_DOMAIN}${localPort}/${uniq}`
+  }
 
+  const coll = DbConn.getColl()
   const mongoRes = await coll.findOne({origin: url})
 
   if (!mongoRes) {
     const uniq = uniqueValue()
-
-    const formShortUrl = () => {
-      const localPort = process.env.NODE_ENV === 'development' ? ':' + port : ''
-      return `${process.env.BASE_DOMAIN}${localPort}/${uniq}`
-    }
 
     await coll.insert({
       origin: url,
@@ -44,9 +43,15 @@ app.get('/new/:url', async (req, res) => {
 
     res.json({
       original_url: url,
-      short_url: formShortUrl()
+      short_url: formShortUrl(uniq)
     })
+    return
   }
+
+  res.json({
+    original_url: mongoRes.origin,
+    short_url: formShortUrl(mongoRes.short)
+  })
 })
 
 app.get('/:link', async (req, res) => {
@@ -63,7 +68,8 @@ app.get('/:link', async (req, res) => {
     return
   }
 
-  res.redirect(`http://${mongoRes.origin}`)
+  const redirectLink = mongoRes.origin.includes('http') ? mongoRes.origin : `http://${mongoRes.origin}`
+  res.redirect(redirectLink)
 })
 
 
